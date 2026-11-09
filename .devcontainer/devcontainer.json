@@ -1,0 +1,27 @@
+{
+  "name": "cinta-hmi",
+  "build": {
+    "dockerfile": "../docker/Dockerfile",
+    "context": "../docker",
+    "args": {
+      "HOST_UID": "1000",
+      "HOST_GID": "1000"
+    }
+  },
+  "remoteUser": "ubuntu",
+  "workspaceFolder": "/trabajo",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/trabajo,type=bind",
+  "containerEnv": {
+    "HOME": "/tmp",
+    "DISPLAY": "${localEnv:DISPLAY}"
+  },
+  "runArgs": [
+    "--volume", "/tmp/.X11-unix:/tmp/.X11-unix",
+    "--group-add", "20"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  }
+}

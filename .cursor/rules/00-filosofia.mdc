@@ -1,0 +1,41 @@
+---
+description: Filosofía y criterios generales del proyecto cinta-hmi
+alwaysApply: true
+---
+
+# Filosofía del proyecto
+
+Este código se defiende en vivo frente a un docente: hay que explicarlo y modificarlo en el momento.
+La prioridad número uno es que un humano lo lea y lo entienda rápido.
+
+## Antes de empezar una tarea
+
+- Leé `docs/contexto.md`: qué se construye, con qué y qué decisiones están firmes o abiertas.
+- Si ves una opción claramente mejor que el plan, decilo antes de implementar. No sigas el plan a ciegas.
+- Si una decisión cambia durante el trabajo, proponé la edición de `docs/contexto.md`.
+
+## Arquitectura
+
+- Capas recortadas: lógica → drivers. No hay capa de interfaces abstractas.
+- La lógica no toca pines ni registros: llama funciones de driver con nombre claro.
+- La lógica no incluye headers de hardware, así se puede compilar y probar en la PC.
+- Un módulo, una responsabilidad. Si cuesta ponerle nombre, hace demasiado.
+
+## Legibilidad antes que brevedad
+
+- Código directo y explícito. Nada de templates genéricos, metaprogramación, macros "inteligentes",
+  one-liners crípticos ni abstracciones "por si acaso".
+- Funciones cortas: si no entra en una pantalla, se parte.
+- Preferí tres líneas obvias a una línea ingeniosa.
+- Constantes con nombre; nada de números mágicos sueltos.
+
+## Nombres y comentarios
+
+- Identificadores en inglés (`StepperDriver`, `motorTask`, `kStepPeriodMs`). Comentarios en español.
+- Los comentarios explican el porqué de una decisión, no repiten lo que el código ya dice.
+
+## Alcance de los cambios
+
+- Cambios chicos y enfocados en lo pedido. No refactorices lo que no se pidió.
+- No agregues dependencias ni librerías sin preguntar.
+- Respetá lo que está fuera de alcance en `docs/contexto.md`, aunque parezca una buena mejora.

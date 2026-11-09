@@ -1,0 +1,16 @@
+---
+description: Restricciones de la HMI y el proceso puente en Linux (PC y Raspberry con EOS)
+globs: "**/rpi/**"
+alwaysApply: false
+---
+
+# HMI y puente en Linux
+
+- Solo POSIX y GuiLite. Ninguna otra dependencia: EOS es un Linux mínimo.
+- El mismo código corre en la PC (framebuffer simulado con `xWindow`) y en la RPi (`/dev/fb0`).
+  Las diferencias van en CMake o en un parámetro de línea de comandos, nunca duplicando archivos.
+- Toda llamada al sistema (`open`, `read`, `write`, `mmap`, `ioctl`, `mkfifo`) se chequea,
+  y si falla se informa qué falló y con qué ruta.
+- Los FIFOs se abren de forma que un proceso no quede trabado esperando al otro.
+- Un FIFO por canal y en un solo sentido; no reutilizar un FIFO para dos cosas.
+- Los archivos dados por la cátedra (`GuiLite.h`, `Consolas_24B.cpp`) no se modifican.

@@ -1,0 +1,18 @@
+---
+description: Restricciones del firmware de la ESP32 (ESP-IDF, C++, FreeRTOS)
+globs: "**/esp32/**"
+alwaysApply: false
+---
+
+# Firmware ESP32
+
+- C++ liviano: clases para drivers, `enum class`, `constexpr`. Sin excepciones, sin `iostream`,
+  sin memoria dinámica en ejecución (`new`, `std::string`, `std::vector`). Buffers fijos y objetos creados al arrancar.
+- FreeRTOS crudo y visible: `xTaskCreatePinnedToCore`, `xQueueCreate`, `xSemaphoreCreate...` llamados directo.
+  No envolver FreeRTOS en clases ni helpers, tampoco el mutex.
+- Todas las tasks se crean en un único lugar, cada una con un comentario que justifique prioridad, stack y núcleo.
+- Mutex: `Take` y `Give` en la misma función, con un solo camino de salida entre ellos.
+- ISRs mínimas (`IRAM_ATTR`): solo avisan con semáforo o notificación; el trabajo lo hace una task.
+- El stack en ESP-IDF se mide en bytes, no en palabras.
+- El hardware se configura en un `init()` explícito llamado desde `app_main`, nunca en constructores globales.
+- Errores con `esp_err_t` y `ESP_ERROR_CHECK`. Logs con `ESP_LOGI`/`ESP_LOGE`.

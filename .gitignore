@@ -1,0 +1,16 @@
+# Volcado local de la materia. El repo no lo necesita para compilar.
+copiaTotalMateria/
+
+# Copia auxiliar del agente.
+cinta-hmi-agente/
+
+# Salidas de CMake y de ESP-IDF
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+
+# Cachés
+.cache/
+.espressif/
