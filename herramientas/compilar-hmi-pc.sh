@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila la HMI para esta PC. El binario queda en rpi/build/pc/.
+# Compila la HMI para esta PC con el preset pc. El binario queda en rpi/build/pc/.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=contenedor.sh
@@ -11,4 +11,4 @@ if [[ ! -f "${CINTA_RAIZ}/rpi/CMakeLists.txt" ]]; then
 fi
 
 contenedor_correr -w /trabajo/rpi -- \
-    bash -c 'cmake -S . -B build/pc && cmake --build build/pc'
+    bash -c 'cmake --preset pc && cmake --build --preset pc'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cruza la HMI para la Raspberry. El binario estático queda en rpi/build/rpi/.
+# Cruza la HMI para la Raspberry con el preset rpi. El binario estático queda en rpi/build/rpi/.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=contenedor.sh
@@ -11,4 +11,4 @@ if [[ ! -f "${CINTA_RAIZ}/rpi/CMakeLists.txt" ]]; then
 fi
 
 contenedor_correr -w /trabajo/rpi -- \
-    bash -c 'cmake -S . -B build/rpi -DCMAKE_TOOLCHAIN_FILE=/trabajo/cmake/toolchain-rpi.cmake && cmake --build build/rpi'
+    bash -c 'cmake --preset rpi && cmake --build --preset rpi'
