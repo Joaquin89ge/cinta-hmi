@@ -1,0 +1,2 @@
+# Pasos del motor del orden del milisegundo. Con 100 Hz el tick es de 10 ms.
+CONFIG_FREERTOS_HZ=1000

@@ -32,6 +32,8 @@ proceso puente (Linux) ──► /tmp/fifo_nav   ──► proceso HMI (GuiLite)
                        ◄── /tmp/fifo_cmd   ◄──
 ```
 
+Para revisar el diseño antes de seguir: [drivers.md](drivers.md), [protocolo.md](protocolo.md) y [freertos.md](freertos.md).
+
 ## Stack
 
 | Parte | Tecnología |
@@ -67,32 +69,39 @@ Evitar GPIO6 a 11 (flash) y los strapping pins (0, 2, 12, 15) como entradas.
 - Velocidad en 3 niveles: BAJA, MEDIA y ALTA (tiempo entre medios pasos de ~8, ~4 y ~2 ms).
 - FreeRTOS con tick a 1000 Hz (`configTICK_RATE_HZ` en menuconfig) para poder dar pasos de milisegundos.
 - La máquina de estados es una función pura (`enum` + `switch`) sin acceso a hardware.
+  Transiciones, diagrama y prueba en la PC: [maquina-estados.md](maquina-estados.md).
 
-## Tasks previstas
+## Tasks
+
+El detalle de colas, semáforos y mutex está en [freertos.md](freertos.md). El código está en `esp32/main/app_main.cpp`. Comparten el núcleo 1: en dos núcleos la prioridad no ordena al motor respecto de seguridad, y un paso podría pisar el corte de las bobinas.
 
 | Task / ISR | Prioridad | Rol |
 |---|---|---|
 | ISR emergencia | interrupción | Da un semáforo a la task de seguridad |
-| seguridad | 5 | Frena el motor y pasa a EMERGENCIA |
-| motor | 4 | Da pasos según el estado y la velocidad |
+| seguridad | 5 | Suelta las bobinas y encola EMERGENCIA |
+| cinta | 4 | Única que llama a `apply`; publica el estado |
+| motor | 3 | Da pasos según el estado y la velocidad |
 | joystick | 2 | Lee el ADC y el botón cada 20 ms y manda navegación |
 | piezas | 2 | Lee el pulsador con antirrebote y cuenta |
 | uart_rx | 2 | Recibe comandos de la HMI y los pone en una cola |
-| uart_tx | 1 | Manda el estado periódicamente |
+| uart_tx | 1 | Manda el estado cada 100 ms y la navegación |
+| latido | 1 | Conmuta el LED azul |
 
-Datos compartidos protegidos con un mutex.
+El `Belt` va bajo un mutex. Otro mutex, `coilMutex`, protege los cuatro GPIO del motor: lo usan la task de seguridad y la del motor, y no se toma junto con el del `Belt`.
 
 ## Protocolo UART (texto, una línea por mensaje)
 
+Los números son los enum de [protocolo.md](protocolo.md). El 0 no se usa.
+
 | Dirección | Mensaje |
 |---|---|
-| ESP32 → RPi | `$EST,<estado>,<velocidad>,<piezas>` |
-| ESP32 → RPi | `$NAV,ARRIBA` / `$NAV,ABAJO` / `$NAV,ENTER` |
-| RPi → ESP32 | `$CMD,START` / `$CMD,STOP` |
-| RPi → ESP32 | `$VEL,BAJA` / `$VEL,MEDIA` / `$VEL,ALTA` |
-| RPi → ESP32 | `$RST_PZ` |
+| ESP32 → RPi | `$1,<estado>,<velocidad>,<piezas>` |
+| ESP32 → RPi | `$2,<nav>` |
+| RPi → ESP32 | `$3,<comando>` |
+| RPi → ESP32 | `$4,<velocidad>` |
+| RPi → ESP32 | `$5` |
 
-El puente ignora las líneas que no empiezan con `$` (así los logs de depuración no molestan).
+El puente ignora las líneas que no empiezan con `$` (así los logs de depuración no molestan). La ESP32 manda el `$1` cada 100 ms. En el banco el enlace es UART2, TX GPIO17 y RX GPIO16, para no pisar la consola de UART0. El cable definitivo a la Raspberry sigue abierto.
 
 ## Pantallas
 
@@ -119,6 +128,7 @@ En emergencia, el estado se muestra en rojo.
 ## Fuera de alcance por ahora
 
 Control PID, encoder, gráficos de respuesta, log a archivo, más pantallas.
+Tampoco el enclavamiento de la emergencia (ARRANCAR sale aunque el pulsador siga apretado) ni la histéresis del joystick.
 Pueden venir después del MVP; no adelantarlos.
 
 ## Fechas
