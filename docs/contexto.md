@@ -24,8 +24,8 @@ Es un MVP: lo mínimo que cumple la consigna, bien hecho y fácil de defender.
 
 ```
 ESP32 (FreeRTOS)
-  joystick, pulsadores, motor, LEDs
-        │ UART (USB en desarrollo; GPIO como plan B)
+  pulsadores, motor, LEDs
+        │ UART2, GPIO17/16 (en la Pi: /dev/ttyS0)
         ▼
 proceso puente (Linux) ──► /tmp/fifo_nav   ──► proceso HMI (GuiLite) ──► framebuffer ──► monitor
                        ──► /tmp/fifo_datos ──►
@@ -51,14 +51,15 @@ Para revisar el diseño antes de seguir: [drivers.md](drivers.md), [protocolo.md
 | Elemento | Pin ESP32 | Notas |
 |---|---|---|
 | Motor 28BYJ-48 + placa ULN2003 | GPIO18, 19, 21, 22 | Medio paso; placa alimentada desde VIN (5 V) |
-| Joystick eje Y | GPIO34 (ADC1) | Alimentado a 3,3 V. Arriba/abajo navegan el menú |
-| Joystick botón (OK) | GPIO25 | Pull-up interno |
+| Pulsador arriba | GPIO32 | A GND, pull-up interno. Sube en el menú |
+| Pulsador abajo | GPIO33 | A GND, pull-up interno. Baja en el menú |
+| Pulsador OK | GPIO25 | A GND, pull-up interno |
 | Pulsador de pieza | GPIO26 | Pull-up interno; cada pulsación suma una pieza |
 | Pulsador de emergencia | GPIO27 | Pull-up interno + interrupción |
 | LED verde (marcha) | GPIO23 | Con resistencia de 220 Ω |
 | LED rojo (emergencia) | GPIO4 | Con resistencia de 220 Ω |
 | LED azul de la placa | GPIO2 | Latido: indica que el programa corre |
-| UART a la RPi (plan B) | TX GPIO17, RX GPIO16 | A RX/TX del GPIO de la RPi, con GND común |
+| UART a la RPi | TX GPIO17, RX GPIO16 | Al RX/TX de la Pi (pin 10 y pin 8), con GND. En la Pi es `/dev/ttyS0` |
 
 Evitar GPIO6 a 11 (flash) y los strapping pins (0, 2, 12, 15) como entradas.
 
@@ -81,7 +82,7 @@ El detalle de colas, semáforos y mutex está en [freertos.md](freertos.md). El 
 | seguridad | 5 | Suelta las bobinas y encola EMERGENCIA |
 | cinta | 4 | Única que llama a `apply`; publica el estado |
 | motor | 3 | Da pasos según el estado y la velocidad |
-| joystick | 2 | Lee el ADC y el botón cada 20 ms y manda navegación |
+| nav | 2 | Lee los tres pulsadores cada 20 ms y manda navegación |
 | piezas | 2 | Lee el pulsador con antirrebote y cuenta |
 | uart_rx | 2 | Recibe comandos de la HMI y los pone en una cola |
 | uart_tx | 1 | Manda el estado cada 100 ms y la navegación |
@@ -101,14 +102,17 @@ Los números son los enum de [protocolo.md](protocolo.md). El 0 no se usa.
 | RPi → ESP32 | `$4,<velocidad>` |
 | RPi → ESP32 | `$5` |
 
-El puente ignora las líneas que no empiezan con `$` (así los logs de depuración no molestan). La ESP32 manda el `$1` cada 100 ms. En el banco el enlace es UART2, TX GPIO17 y RX GPIO16, para no pisar la consola de UART0. El cable definitivo a la Raspberry sigue abierto.
+El puente ignora las líneas que no empiezan con `$` (así los logs de depuración no molestan). La ESP32 manda el `$1` cada 100 ms. El enlace es UART2, TX GPIO17 y RX GPIO16, para no pisar la consola de UART0. En la Pi se enciende con `enable_uart=1` y el puente abre `/dev/ttyS0`. El USB (`kUartUsb`, `/dev/ttyACM0`) queda solo para probar en la PC, y hay que flashear para volver.
 
 ## Pantallas
 
-1. **Principal**: estado, velocidad, piezas; botones ARRANCAR, PARAR y AJUSTES.
-2. **Ajustes**: velocidad (spin box), RESET PIEZAS y VOLVER.
+Una sola pantalla. Arriba la información y abajo las acciones, en este orden visual y de foco:
 
-En emergencia, el estado se muestra en rojo.
+1. Etiquetas: estado, velocidad y piezas. En emergencia el estado va en rojo.
+2. ARRANCAR (`$3,1`) y PARAR (`$3,2`).
+3. Spin de velocidad. El número es el nivel (1 baja, 2 media, 3 alta) y no toma foco. «+» sube un nivel y «−» lo baja, sin pasar de 3 ni de 1, y mandan `$4`.
+
+El foco baja así: ARRANCAR, PARAR, «+», «−».
 
 ## Decisiones
 
@@ -123,12 +127,12 @@ En emergencia, el estado se muestra en rojo.
 | Motor paso a paso 28BYJ-48 | firme |
 | Protocolo de texto sin checksum | abierta |
 | Velocidad en 3 niveles en vez de continua | abierta |
-| Conexión ESP32–RPi por USB o por GPIO | abierta (depende de que EOS reconozca el CH9102). En la PC de desarrollo ese USB aparece como `/dev/ttyACM0` |
+| Conexión ESP32–RPi por UART2 (GPIO17/16, `/dev/ttyS0`) | firme. El USB no: el EOS no trae el driver del CH9102 |
 
 ## Fuera de alcance por ahora
 
 Control PID, encoder, gráficos de respuesta, log a archivo, más pantallas.
-Tampoco el enclavamiento de la emergencia (ARRANCAR sale aunque el pulsador siga apretado) ni la histéresis del joystick.
+Tampoco el enclavamiento de la emergencia (ARRANCAR sale aunque el pulsador siga apretado).
 Pueden venir después del MVP; no adelantarlos.
 
 ## Fechas

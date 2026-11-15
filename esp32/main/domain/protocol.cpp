@@ -1,106 +1,44 @@
 #include "protocol.hpp"
 
-#include <climits>
 #include <cstddef>
 #include <cstdio>
 
 namespace {
 
-StateCode stateCode(BeltState state) {
-    switch (state) {
-    case BeltState::Stopped:
-        return StateCode::Stopped;
-    case BeltState::Running:
-        return StateCode::Running;
-    case BeltState::Emergency:
-        return StateCode::Emergency;
-    }
-    return StateCode::Stopped;
-}
-
-SpeedCode speedCode(Speed speed) {
-    switch (speed) {
-    case Speed::Low:
-        return SpeedCode::Low;
-    case Speed::Medium:
-        return SpeedCode::Medium;
-    case Speed::High:
-        return SpeedCode::High;
-    }
-    return SpeedCode::Low;
-}
-
-bool beltState(int code, BeltState& state) {
-    switch (static_cast<StateCode>(code)) {
-    case StateCode::Stopped:
-        state = BeltState::Stopped;
-        return true;
-    case StateCode::Running:
-        state = BeltState::Running;
-        return true;
-    case StateCode::Emergency:
-        state = BeltState::Emergency;
-        return true;
-    }
-    return false;
-}
-
-bool beltSpeed(int code, Speed& speed) {
-    switch (static_cast<SpeedCode>(code)) {
-    case SpeedCode::Low:
-        speed = Speed::Low;
-        return true;
-    case SpeedCode::Medium:
-        speed = Speed::Medium;
-        return true;
-    case SpeedCode::High:
-        speed = Speed::High;
-        return true;
-    }
-    return false;
-}
-
-bool copyLine(const char* line, char* dest, int capacity) {
-    int i = 0;
-    while (line[i] != '\0' && line[i] != '\n' && line[i] != '\r') {
-        if (i >= capacity - 1) {
-            return false;
-        }
-        dest[i] = line[i];
-        i += 1;
-    }
-    dest[i] = '\0';
-    return i > 0;
-}
-
-bool readInt(const char* text, int& index, int& value) {
-    if (text[index] < '0' || text[index] > '9') {
+// Fin, \n, \r, o \r\n. Un carácter de más (otro campo, por ejemplo) no es esta línea.
+bool tailOk(const char* line, int got, int fields, char tail, int at) {
+    if (got < fields || at < 0) {
         return false;
     }
-    value = 0;
-    while (text[index] >= '0' && text[index] <= '9') {
-        int digit = text[index] - '0';
-        // Un int desbordado se leería como otro número. Se corta antes de multiplicar.
-        if (value > (INT_MAX - digit) / 10) {
-            return false;
-        }
-        value = value * 10 + digit;
-        index += 1;
+    if (line[at] == '\0') {
+        return got == fields;
     }
-    return true;
+    if (got != fields + 1) {
+        return false;
+    }
+    if (tail == '\n') {
+        return line[at + 1] == '\0';
+    }
+    if (tail == '\r') {
+        return line[at + 1] == '\0' || (line[at + 1] == '\n' && line[at + 2] == '\0');
+    }
+    return false;
+}
+
+bool inRange(int value, int low, int high) {
+    return value >= low && value <= high;
 }
 
 }  // namespace
 
 bool writeStateLine(char* buffer, int capacity, Belt belt) {
-    // El número que sale es el del enum. No hay una segunda tabla de códigos.
     int written = std::snprintf(
         buffer,
         static_cast<std::size_t>(capacity),
         "$%d,%d,%d,%d\n",
         static_cast<int>(MessageType::State),
-        static_cast<int>(stateCode(belt.state)),
-        static_cast<int>(speedCode(belt.speed)),
+        static_cast<int>(belt.state),
+        static_cast<int>(belt.speed),
         belt.pieces);
     return written > 0 && written < capacity;
 }
@@ -125,7 +63,7 @@ bool writeCommandLine(char* buffer, int capacity, CommandCode command) {
     return written > 0 && written < capacity;
 }
 
-bool writeSpeedLine(char* buffer, int capacity, SpeedCode speed) {
+bool writeSpeedLine(char* buffer, int capacity, Speed speed) {
     int written = std::snprintf(
         buffer,
         static_cast<std::size_t>(capacity),
@@ -145,121 +83,79 @@ bool writeResetLine(char* buffer, int capacity) {
 }
 
 bool readStateLine(const char* line, Belt& belt) {
-    // El $1 informa cómo está la cinta. No es un evento: no pasa por apply.
-    char text[kLineCapacity];
-    if (!copyLine(line, text, kLineCapacity)) {
-        return false;
-    }
-    if (text[0] != '$') {
-        return false;
-    }
-
-    int index = 1;
     int type = 0;
-    if (!readInt(text, index, type) || type != static_cast<int>(MessageType::State)) {
-        return false;
-    }
-
-    int stateCodeValue = 0;
-    int speedCodeValue = 0;
+    int state = 0;
+    int speed = 0;
     int pieces = 0;
-    if (text[index] != ',') {
+    char tail = '\0';
+    int at = -1;
+    int got = std::sscanf(line, "$%d,%d,%d,%d%n%c", &type, &state, &speed, &pieces, &at, &tail);
+    if (!tailOk(line, got, 4, tail, at)) {
         return false;
     }
-    index += 1;
-    if (!readInt(text, index, stateCodeValue) || text[index] != ',') {
+    if (type != static_cast<int>(MessageType::State)) {
         return false;
     }
-    index += 1;
-    if (!readInt(text, index, speedCodeValue) || text[index] != ',') {
+    if (!inRange(state, static_cast<int>(BeltState::Stopped), static_cast<int>(BeltState::Emergency))) {
         return false;
     }
-    index += 1;
-    if (!readInt(text, index, pieces) || text[index] != '\0') {
-        return false;
-    }
-
-    BeltState state = BeltState::Stopped;
-    Speed speed = Speed::Low;
-    if (!beltState(stateCodeValue, state) || !beltSpeed(speedCodeValue, speed)) {
+    if (!inRange(speed, static_cast<int>(Speed::Low), static_cast<int>(Speed::High))) {
         return false;
     }
 
-    belt.state = state;
-    belt.speed = speed;
+    belt.state = static_cast<BeltState>(state);
+    belt.speed = static_cast<Speed>(speed);
     belt.pieces = pieces;
     return true;
 }
 
 bool interpret(const char* line, BeltEvent& event) {
-    char text[kLineCapacity];
-    if (!copyLine(line, text, kLineCapacity)) {
-        return false;
-    }
-    if (text[0] != '$') {
-        return false;
-    }
-
-    int index = 1;
     int type = 0;
-    if (!readInt(text, index, type)) {
-        return false;
-    }
-
     int code = 0;
-    bool hasCode = false;
-    if (text[index] == ',') {
-        index += 1;
-        if (!readInt(text, index, code)) {
+    char tail = '\0';
+    int at = -1;
+    int got = std::sscanf(line, "$%d,%d%n%c", &type, &code, &at, &tail);
+    if (got >= 2 && tailOk(line, got, 2, tail, at)) {
+        if (type == static_cast<int>(MessageType::Command)) {
+            if (code == static_cast<int>(CommandCode::Start)) {
+                event = BeltEvent::Start;
+                return true;
+            }
+            if (code == static_cast<int>(CommandCode::Stop)) {
+                event = BeltEvent::Stop;
+                return true;
+            }
             return false;
         }
-        hasCode = true;
-    }
-    // Una acción no lleva campos de más. El estado que llega por error cae abajo.
-    if (text[index] != '\0') {
+        if (type == static_cast<int>(MessageType::Speed)) {
+            if (!inRange(code, static_cast<int>(Speed::Low), static_cast<int>(Speed::High))) {
+                return false;
+            }
+            switch (static_cast<Speed>(code)) {
+            case Speed::Low:
+                event = BeltEvent::SetLow;
+                return true;
+            case Speed::Medium:
+                event = BeltEvent::SetMedium;
+                return true;
+            case Speed::High:
+                event = BeltEvent::SetHigh;
+                return true;
+            }
+            return false;
+        }
         return false;
     }
 
-    // Único lugar donde un número de acción pasa a ser un BeltEvent.
-    switch (static_cast<MessageType>(type)) {
-    case MessageType::Command:
-        if (!hasCode) {
-            return false;
-        }
-        switch (static_cast<CommandCode>(code)) {
-        case CommandCode::Start:
-            event = BeltEvent::Start;
-            return true;
-        case CommandCode::Stop:
-            event = BeltEvent::Stop;
-            return true;
-        }
-        return false;
-    case MessageType::Speed:
-        if (!hasCode) {
-            return false;
-        }
-        switch (static_cast<SpeedCode>(code)) {
-        case SpeedCode::Low:
-            event = BeltEvent::SetLow;
-            return true;
-        case SpeedCode::Medium:
-            event = BeltEvent::SetMedium;
-            return true;
-        case SpeedCode::High:
-            event = BeltEvent::SetHigh;
-            return true;
-        }
-        return false;
-    case MessageType::ResetPieces:
-        if (hasCode) {
-            return false;
-        }
-        event = BeltEvent::ResetPieces;
-        return true;
-    case MessageType::State:
-    case MessageType::Nav:
+    tail = '\0';
+    at = -1;
+    got = std::sscanf(line, "$%d%n%c", &type, &at, &tail);
+    if (!tailOk(line, got, 1, tail, at)) {
         return false;
     }
-    return false;
+    if (type != static_cast<int>(MessageType::ResetPieces)) {
+        return false;
+    }
+    event = BeltEvent::ResetPieces;
+    return true;
 }

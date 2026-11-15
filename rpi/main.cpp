@@ -25,6 +25,8 @@ const char* kHelp =
     "  cinta_hmi shared-fb\n"
     "  cinta_hmi /dev/fb0\n";
 
+// xWindow crea la memoria compartida. Tamaño 0 engancha la que ya existe,
+// no pide otra. Se reintenta porque este proceso puede arrancar antes que la ventana.
 void* getSharedFramebuffer(int sharedId) {
     while (true) {
         int shmid = shmget(sharedId, 0, SHM_R | SHM_W);
@@ -78,6 +80,7 @@ void* getDeviceFramebuffer(const char* path, int& width, int& height, int& color
 int main(int argc, char** argv) {
     std::printf("%s", kHelp);
 
+    // 2 bytes por pixel: el RGB565 de xWindow y del framebuffer de la cátedra.
     int colorBytes = 2;
     int screenWidth = kScreenWidth;
     int screenHeight = kScreenHeight;
@@ -98,6 +101,8 @@ int main(int argc, char** argv) {
         }
     }
 
+    // shared-fb: ventana de la PC. /dev/fb0: monitor de la Raspberry.
+    // Sin argumento se reserva memoria y no se ve nada.
     void* fb = nullptr;
     switch (mode) {
     case FB_APP_MODE:

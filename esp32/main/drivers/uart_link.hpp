@@ -3,9 +3,6 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 
-// Mismo tope que kLineCapacity del protocolo. app_main lo comprueba.
-constexpr int kUartLineCapacity = 64;
-
 struct UartConfig {
     uart_port_t port;
     gpio_num_t tx;
@@ -23,7 +20,4 @@ public:
 
 private:
     UartConfig config_;
-    char pending_[kUartLineCapacity] = {};
-    int pendingLength_ = 0;
-    bool discarding_ = false;
 };

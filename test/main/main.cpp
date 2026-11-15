@@ -1,8 +1,7 @@
-// Prueba de banco: los tres LED, un tramo de motor y las cuatro entradas.
+// Prueba de banco: los tres LED, un tramo de motor y los pulsadores.
 // No es la cinta. Sirve para ver cables antes de flashear esp32/.
 
 #include "button.hpp"
-#include "joystick_axis.hpp"
 #include "led.hpp"
 #include "pins.hpp"
 #include "stepper.hpp"
@@ -33,21 +32,24 @@ extern "C" void app_main(void) {
     Led green(kLedGreen);
     Led red(kLedRed);
     Led blue(kLedBlue);
+    Button up(kButtonUp);
+    Button down(kButtonDown);
     Button ok(kButtonOk);
     Button piece(kButtonPiece);
     Button emergency(kButtonEmergency);
     StepperDriver stepper(kStepperIn1, kStepperIn2, kStepperIn3, kStepperIn4);
-    JoystickAxis joystick(kJoystickYChannel);
-    UartLink link({kUartPort, kUartTx, kUartRx, kUartBaud});
+    // El mismo cable que la cinta. Hoy es el USB; ver kUart en pins.hpp.
+    UartLink link({kUart.port, kUart.tx, kUart.rx, kUartBaud});
 
     green.init();
     red.init();
     blue.init();
+    up.init();
+    down.init();
     ok.init();
     piece.init();
     emergency.init();
     stepper.init();
-    joystick.init();
     link.init();
 
     ESP_LOGI(kTag, "leds: verde, rojo, azul");
@@ -62,7 +64,7 @@ extern "C" void app_main(void) {
     }
     stepper.release();
 
-    ESP_LOGI(kTag, "entradas: 1 es apretado. Mové el joystick y los pulsadores.");
+    ESP_LOGI(kTag, "entradas: 1 es apretado. Apretá los pulsadores.");
     int elapsedMs = 0;
     while (true) {
         if (piece.isPressed()) {
@@ -86,11 +88,12 @@ extern "C" void app_main(void) {
             elapsedMs = 0;
             ESP_LOGI(
                 kTag,
-                "ok=%d pieza=%d emer=%d adc=%d",
+                "arriba=%d abajo=%d ok=%d pieza=%d emer=%d",
+                up.isPressed() ? 1 : 0,
+                down.isPressed() ? 1 : 0,
                 ok.isPressed() ? 1 : 0,
                 piece.isPressed() ? 1 : 0,
-                emergency.isPressed() ? 1 : 0,
-                joystick.readRaw());
+                emergency.isPressed() ? 1 : 0);
         }
         vTaskDelay(pdMS_TO_TICKS(kSampleMs));
     }

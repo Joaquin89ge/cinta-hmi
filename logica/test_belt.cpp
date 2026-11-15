@@ -107,7 +107,7 @@ int main() {
 
     assert(writeCommandLine(line, kLineCapacity, CommandCode::Start));
     assert(std::strcmp(line, "$3,1\n") == 0);
-    assert(writeSpeedLine(line, kLineCapacity, SpeedCode::Medium));
+    assert(writeSpeedLine(line, kLineCapacity, Speed::Medium));
     assert(std::strcmp(line, "$4,2\n") == 0);
     assert(writeResetLine(line, kLineCapacity));
     assert(std::strcmp(line, "$5\n") == 0);

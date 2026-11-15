@@ -10,35 +10,33 @@ extern const LATTICE_FONT_INFO Consolas_24B;
 
 namespace {
 
+// Medidas del menú.
 constexpr short kMargin = 16;
 constexpr short kRowHeight = 48;
 constexpr short kGap = 8;
 constexpr short kButtonWidth = 280;
-constexpr short kSpinWidth = 300;
+// El estado en emergencia va en rojo.
 constexpr unsigned int kEmergencyColor = GL_RGB(220, 40, 40);
 
+// IDs de esta ventana. Las flechas del spin (0x1111 y 0x2222) no se reutilizan.
 enum {
     ID_MAIN = 1,
-    ID_SETTINGS_ROOT,
     ID_TITLE,
     ID_STATE,
     ID_SPEED,
     ID_PIECES,
     ID_START,
     ID_STOP,
-    ID_OPEN_SETTINGS,
-    ID_SPEED_LABEL,
     ID_SPIN,
-    ID_RESET,
-    ID_BACK,
 };
 
 c_surface* surface = nullptr;
 c_display* display = nullptr;
+// Último estado que llegó. Antes del primer mensaje la cinta figura parada.
 Belt storedBelt;
+// Ventana que usan los FIFO para mover el foco. Queda en null hasta que open terminó.
 c_wnd* connected = nullptr;
 MainScreen mainScreen;
-SettingsScreen settingsScreen;
 
 const char* stateName(BeltState state) {
     switch (state) {
@@ -64,19 +62,6 @@ const char* speedName(Speed speed) {
     return "BAJA";
 }
 
-// Speed::Low es 0. El spin y el protocolo cuentan desde SpeedCode::Low, que es 1.
-unsigned short speedLevel(Speed speed) {
-    switch (speed) {
-    case Speed::Low:
-        return static_cast<unsigned short>(SpeedCode::Low);
-    case Speed::Medium:
-        return static_cast<unsigned short>(SpeedCode::Medium);
-    case Speed::High:
-        return static_cast<unsigned short>(SpeedCode::High);
-    }
-    return static_cast<unsigned short>(SpeedCode::Low);
-}
-
 void send(CommandCode command) {
     char line[kLineCapacity];
     if (!writeCommandLine(line, kLineCapacity, command)) {
@@ -86,7 +71,7 @@ void send(CommandCode command) {
     writeOrder(line);
 }
 
-void sendSpeed(SpeedCode speed) {
+void sendSpeed(Speed speed) {
     char line[kLineCapacity];
     if (!writeSpeedLine(line, kLineCapacity, speed)) {
         std::fprintf(stderr, "No entra la velocidad en la línea\n");
@@ -95,33 +80,7 @@ void sendSpeed(SpeedCode speed) {
     writeOrder(line);
 }
 
-void sendReset() {
-    char line[kLineCapacity];
-    if (!writeResetLine(line, kLineCapacity)) {
-        std::fprintf(stderr, "No entra el reset en la línea\n");
-        return;
-    }
-    writeOrder(line);
-}
-
-void showMain() {
-    if (connected == &settingsScreen) {
-        connected = nullptr;
-        settingsScreen.disconnect();
-    }
-    mainScreen.open(surface);
-    connected = &mainScreen;
-}
-
-void showSettings() {
-    if (connected == &mainScreen) {
-        connected = nullptr;
-        mainScreen.disconnect();
-    }
-    settingsScreen.open(surface);
-    connected = &settingsScreen;
-}
-
+// Letra y colores de botones y etiquetas, una sola vez antes de dibujar.
 void loadTheme() {
     c_theme::add_font(FONT_DEFAULT, &Consolas_24B);
     c_theme::add_color(COLOR_WND_FONT, GL_RGB(255, 255, 243));
@@ -134,17 +93,21 @@ void loadTheme() {
 }  // namespace
 
 void mainLoop(void* phy_fb, int width, int height, int color_bytes) {
+    // Tema, después la superficie y recién ahí el menú.
     loadTheme();
     surface = new c_surface(kScreenWidth, kScreenHeight, static_cast<unsigned int>(color_bytes), Z_ORDER_LEVEL_2);
-    // Vive todo el proceso: cada pixel de la superficie sale por acá.
+    // Vive todo el proceso: cada pixel sale por acá.
     display = new c_display(phy_fb, width, height, surface);
     openFifos();
-    showMain();
+    mainScreen.open(surface);
+    connected = &mainScreen;
+    // Espera líneas del puente; el enter lo atiende el botón.
     while (true) {
         pollFifos();
     }
 }
 
+// Guardo el estado y, si el menú ya está abierto, lo redibujo.
 void showState(Belt belt) {
     storedBelt = belt;
     if (connected == &mainScreen) {
@@ -152,10 +115,12 @@ void showState(Belt belt) {
     }
 }
 
+// Los FIFO la piden para llamar on_navigate.
 c_wnd* connectedScreen() {
     return connected;
 }
 
+// Armo la lista de controles, los conecto a la ventana y los muestro.
 void MainScreen::open(c_surface* next) {
     set_surface(next);
     fillTree();
@@ -164,21 +129,25 @@ void MainScreen::open(c_surface* next) {
 }
 
 void MainScreen::pre_create_wnd() {
-    // disconnect deja m_attr en 0. Sin ATTR_VISIBLE, show_window no dibuja.
-    // Sin ATTR_FOCUS, on_navigate no mueve el foco.
+    // disconnect deja m_attr en 0.
+    // ATTR_VISIBLE: show_window dibuja. ATTR_FOCUS: on_navigate mueve el foco.
     m_attr = static_cast<WND_ATTRIBUTION>(ATTR_VISIBLE | ATTR_FOCUS);
     m_bg_color = c_theme::get_color(COLOR_WND_NORMAL);
 }
 
 void MainScreen::on_init_children() {
-    // pre_create_wnd del botón pone on_click en cero: el callback va después de connect.
+    // Ya están creados: les digo qué llamar al apretarlos y dejo el foco en ARRANCAR.
+    // El click nace en cero, por eso el callback va acá.
     start_.set_on_click(static_cast<WND_CALLBACK>(&MainScreen::onStart));
     stop_.set_on_click(static_cast<WND_CALLBACK>(&MainScreen::onStop));
-    settings_.set_on_click(static_cast<WND_CALLBACK>(&MainScreen::onSettings));
+    speedSpin_.set_on_change(static_cast<WND_CALLBACK>(&MainScreen::onSpeed));
+    speedSpin_.set_max_min(static_cast<short>(Speed::High), static_cast<short>(Speed::Low));
+    speedSpin_.set_step(1);
     paintBelt(storedBelt);
     focusFirst();
 }
 
+// Fondo de la ventana. Las etiquetas se pintan solas encima.
 void MainScreen::on_paint() {
     c_rect rect;
     get_screen_rect(rect);
@@ -186,6 +155,7 @@ void MainScreen::on_paint() {
 }
 
 void MainScreen::paintBelt(const Belt& belt) {
+    // Armo los tres textos.
     std::snprintf(stateText_, kTextCapacity, "Estado: %s", stateName(belt.state));
     std::snprintf(speedText_, kTextCapacity, "Velocidad: %s", speedName(belt.speed));
     std::snprintf(piecesText_, kTextCapacity, "Piezas: %d", belt.pieces);
@@ -193,29 +163,40 @@ void MainScreen::paintBelt(const Belt& belt) {
     state_.set_str(stateText_);
     speed_.set_str(speedText_);
     pieces_.set_str(piecesText_);
+    // En emergencia el estado va en rojo.
     unsigned int color = c_theme::get_color(COLOR_WND_FONT);
     if (belt.state == BeltState::Emergency) {
         color = kEmergencyColor;
     }
     state_.set_font_color(color);
+    // set_value no llama a on_change: cambio el número sin mandar comando.
+    speedSpin_.set_value(static_cast<unsigned short>(belt.speed));
+    // connected es this recién al terminar open. Antes, show_window no dibuja.
     if (connected != this) {
         return;
     }
     state_.show_window();
     speed_.show_window();
     pieces_.show_window();
+    speedSpin_.show_window();
 }
 
+// Mando arrancar.
 void MainScreen::onStart(int, int) {
     send(CommandCode::Start);
 }
 
+// Mando parar.
 void MainScreen::onStop(int, int) {
     send(CommandCode::Stop);
 }
 
-void MainScreen::onSettings(int, int) {
-    showSettings();
+// Mando la velocidad nueva.
+void MainScreen::onSpeed(int, int value) {
+    if (value < static_cast<int>(Speed::Low) || value > static_cast<int>(Speed::High)) {
+        return;
+    }
+    sendSpeed(static_cast<Speed>(value));
 }
 
 void MainScreen::fillTree() {
@@ -223,6 +204,7 @@ void MainScreen::fillTree() {
     const short buttonX = static_cast<short>((kScreenWidth - kButtonWidth) / 2);
     short y = kMargin;
 
+    // De arriba a abajo: título, datos, botones y el spin.
     tree_[0] = {&title_, ID_TITLE, "CINTA L1", kMargin, y, labelWidth, kRowHeight, nullptr};
     y = static_cast<short>(y + kRowHeight);
     tree_[1] = {&state_, ID_STATE, stateText_, kMargin, y, labelWidth, kRowHeight, nullptr};
@@ -235,96 +217,15 @@ void MainScreen::fillTree() {
     y = static_cast<short>(y + kRowHeight + kGap);
     tree_[5] = {&stop_, ID_STOP, "PARAR", buttonX, y, kButtonWidth, kRowHeight, nullptr};
     y = static_cast<short>(y + kRowHeight + kGap);
-    tree_[6] = {&settings_, ID_OPEN_SETTINGS, "AJUSTES", buttonX, y, kButtonWidth, kRowHeight, nullptr};
+    // Va último: + y − se cuelgan del padre al crearlo y quedan al final.
+    // El número no tiene foco, así que el orden es ARRANCAR, PARAR, +, −.
+    tree_[6] = {&speedSpin_, ID_SPIN, nullptr, buttonX, y, kButtonWidth, static_cast<short>(kRowHeight * 2), nullptr};
+    // El {} final marca que no hay más controles.
     tree_[7] = {};
 }
 
+// Las etiquetas no tienen foco: el primero es ARRANCAR.
 void MainScreen::focusFirst() {
-    c_wnd* child = m_top_child;
-    while (child != nullptr) {
-        if (child->is_focus_wnd()) {
-            set_child_focus(child);
-            return;
-        }
-        child = child->get_next_sibling();
-    }
-}
-
-void SettingsScreen::open(c_surface* next) {
-    set_surface(next);
-    fillTree();
-    connect(nullptr, ID_SETTINGS_ROOT, nullptr, 0, 0, kScreenWidth, kScreenHeight, tree_);
-    show_window();
-}
-
-void SettingsScreen::pre_create_wnd() {
-    // Igual que la principal: disconnect apaga ATTR_VISIBLE y ATTR_FOCUS.
-    m_attr = static_cast<WND_ATTRIBUTION>(ATTR_VISIBLE | ATTR_FOCUS);
-    m_bg_color = c_theme::get_color(COLOR_WND_NORMAL);
-}
-
-void SettingsScreen::on_init_children() {
-    speed_.set_on_change(static_cast<WND_CALLBACK>(&SettingsScreen::onSpeed));
-    speed_.set_max_min(static_cast<short>(SpeedCode::High), static_cast<short>(SpeedCode::Low));
-    speed_.set_step(1);
-    // set_value no llama a on_change: abrir Ajustes no manda $4.
-    speed_.set_value(speedLevel(storedBelt.speed));
-    reset_.set_on_click(static_cast<WND_CALLBACK>(&SettingsScreen::onReset));
-    back_.set_on_click(static_cast<WND_CALLBACK>(&SettingsScreen::onBack));
-    focusFirst();
-}
-
-void SettingsScreen::on_paint() {
-    c_rect rect;
-    get_screen_rect(rect);
-    m_surface->fill_rect(rect, c_theme::get_color(COLOR_WND_NORMAL), static_cast<unsigned int>(m_z_order));
-}
-
-void SettingsScreen::onSpeed(int, int value) {
-    switch (value) {
-    case static_cast<int>(SpeedCode::Low):
-        sendSpeed(SpeedCode::Low);
-        break;
-    case static_cast<int>(SpeedCode::Medium):
-        sendSpeed(SpeedCode::Medium);
-        break;
-    case static_cast<int>(SpeedCode::High):
-        sendSpeed(SpeedCode::High);
-        break;
-    default:
-        break;
-    }
-}
-
-void SettingsScreen::onReset(int, int) {
-    sendReset();
-}
-
-void SettingsScreen::onBack(int, int) {
-    showMain();
-}
-
-void SettingsScreen::fillTree() {
-    const short labelWidth = static_cast<short>(kScreenWidth - 2 * kMargin);
-    const short buttonX = static_cast<short>((kScreenWidth - kButtonWidth) / 2);
-    const short spinX = static_cast<short>((kScreenWidth - kSpinWidth) / 2);
-    short y = kMargin;
-
-    tree_[0] = {&title_, ID_TITLE, "AJUSTES", kMargin, y, labelWidth, kRowHeight, nullptr};
-    y = static_cast<short>(y + kRowHeight);
-    tree_[1] = {&speedLabel_, ID_SPEED_LABEL, "Velocidad", kMargin, y, labelWidth, kRowHeight, nullptr};
-    y = static_cast<short>(y + kRowHeight);
-    // Antes que los botones: pre_create_wnd del spin inserta + y - en el padre,
-    // y esos dos (ATTR_FOCUS) son los que reciben el foco, no el número.
-    tree_[2] = {&speed_, ID_SPIN, nullptr, spinX, y, kSpinWidth, static_cast<short>(kRowHeight * 2), nullptr};
-    y = static_cast<short>(y + kRowHeight * 2 + kMargin);
-    tree_[3] = {&reset_, ID_RESET, "RESET PIEZAS", buttonX, y, kButtonWidth, kRowHeight, nullptr};
-    y = static_cast<short>(y + kRowHeight + kGap);
-    tree_[4] = {&back_, ID_BACK, "VOLVER", buttonX, y, kButtonWidth, kRowHeight, nullptr};
-    tree_[5] = {};
-}
-
-void SettingsScreen::focusFirst() {
     c_wnd* child = m_top_child;
     while (child != nullptr) {
         if (child->is_focus_wnd()) {

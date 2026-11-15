@@ -3,16 +3,17 @@
 // Lógica de la cinta, sin pines ni FreeRTOS.
 // apply devuelve el valor siguiente para que ninguna task comparta una variable global.
 
-enum class BeltState {
-    Stopped,
-    Running,
-    Emergency,
+// Los números son los del cable. No hay una segunda tabla de códigos.
+enum class BeltState : int {
+    Stopped = 1,
+    Running = 2,
+    Emergency = 3,
 };
 
-enum class Speed {
-    Low,
-    Medium,
-    High,
+enum class Speed : int {
+    Low = 1,
+    Medium = 2,
+    High = 3,
 };
 
 enum class BeltEvent {

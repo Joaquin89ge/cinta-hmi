@@ -18,6 +18,15 @@ if [[ ! -x "${ventana}" ]]; then
     exit 1
 fi
 
+# La X de xWindow no cerraba el proceso, y cada apertura nueva se sumaba.
+# Una sola HMI puede leer los FIFO: la anterior se termina acá.
+if pgrep -x cinta_hmi >/dev/null || pgrep -x xWindow >/dev/null; then
+    echo "Había una HMI de antes en segundo plano. La cierro." >&2
+    pkill -x cinta_hmi 2>/dev/null || true
+    pkill -x xWindow 2>/dev/null || true
+    sleep 0.3
+fi
+
 # El FIFO se crea en el /tmp del host y se monta adentro. Así un echo
 # desde otra terminal de esta máquina llega a la HMI.
 for fifo in /tmp/fifo_nav /tmp/fifo_datos /tmp/fifo_cmd; do
@@ -38,8 +47,22 @@ contenedor_correr \
                 mkfifo "${fifo}"
             fi
         done
-        ./xWindow 512 512 >/tmp/xwindow-hmi.log 2>&1 &
+        # El binario de la cátedra ignora la X. La biblioteca hace que ese clic salga.
+        so=/trabajo/rpi/build/pc/xwindow-cierre.so
+        src=/trabajo/herramientas/xwindow-cierre.c
+        if [[ ! -e "${so}" || "${src}" -nt "${so}" ]]; then
+            mkdir -p /trabajo/rpi/build/pc
+            gcc -shared -fPIC -o "${so}" "${src}" -lX11
+        fi
+        LD_PRELOAD="${so}" ./xWindow 512 512 >/tmp/xwindow-hmi.log 2>&1 &
         xw=$!
-        trap '\''kill "${xw}" 2>/dev/null || true; wait "${xw}" 2>/dev/null || true'\'' EXIT
-        /trabajo/rpi/build/pc/cinta_hmi shared-fb
+        /trabajo/rpi/build/pc/cinta_hmi shared-fb &
+        hmi=$!
+        # Si se cierra la ventana, o si la HMI termina, caen los dos.
+        cerrar() {
+            kill "${xw}" "${hmi}" 2>/dev/null || true
+            wait "${xw}" "${hmi}" 2>/dev/null || true
+        }
+        trap cerrar EXIT INT TERM
+        wait -n "${xw}" "${hmi}" || true
     '

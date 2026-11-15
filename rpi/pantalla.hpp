@@ -18,7 +18,7 @@ private:
     void on_paint() override;
     void onStart(int id, int param);
     void onStop(int id, int param);
-    void onSettings(int id, int param);
+    void onSpeed(int id, int value);
     void fillTree();
     void focusFirst();
 
@@ -28,33 +28,11 @@ private:
     c_label pieces_;
     c_button start_;
     c_button stop_;
-    c_button settings_;
+    c_spin_box speedSpin_;
     WND_TREE tree_[8]{};
     char stateText_[kTextCapacity]{};
     char speedText_[kTextCapacity]{};
     char piecesText_[kTextCapacity]{};
-};
-
-class SettingsScreen : public c_wnd {
-public:
-    void open(c_surface* surface);
-
-private:
-    void pre_create_wnd() override;
-    void on_init_children() override;
-    void on_paint() override;
-    void onSpeed(int id, int value);
-    void onReset(int id, int param);
-    void onBack(int id, int param);
-    void fillTree();
-    void focusFirst();
-
-    c_label title_;
-    c_label speedLabel_;
-    c_spin_box speed_;
-    c_button reset_;
-    c_button back_;
-    WND_TREE tree_[6]{};
 };
 
 void mainLoop(void* phy_fb, int width, int height, int color_bytes);

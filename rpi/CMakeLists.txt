@@ -18,6 +18,7 @@ add_executable(cinta_hmi
 target_include_directories(cinta_hmi PRIVATE
     terceros
     ../esp32/main/domain
+    ../comun
 )
 
 target_compile_options(cinta_hmi PRIVATE -pthread)

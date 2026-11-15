@@ -15,18 +15,6 @@ enum class MessageType : int {
     ResetPieces = 5,
 };
 
-enum class StateCode : int {
-    Stopped = 1,
-    Running = 2,
-    Emergency = 3,
-};
-
-enum class SpeedCode : int {
-    Low = 1,
-    Medium = 2,
-    High = 3,
-};
-
 enum class NavCode : int {
     Up = 1,
     Down = 2,
@@ -42,7 +30,7 @@ enum class CommandCode : int {
 bool writeStateLine(char* buffer, int capacity, Belt belt);
 bool writeNavLine(char* buffer, int capacity, NavCode nav);
 bool writeCommandLine(char* buffer, int capacity, CommandCode command);
-bool writeSpeedLine(char* buffer, int capacity, SpeedCode speed);
+bool writeSpeedLine(char* buffer, int capacity, Speed speed);
 bool writeResetLine(char* buffer, int capacity);
 
 // Lee un $1 y llena belt. Si la línea no es un estado válido, devuelve false

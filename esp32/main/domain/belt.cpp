@@ -25,6 +25,8 @@ Belt apply(Belt belt, BeltEvent event) {
         break;
     }
 
+    // Start, Stop y Emergency. En cada estado, lo que no está escrito no cambia nada:
+    // PARAR estando parada, o ARRANCAR ya en marcha, se ignoran.
     switch (belt.state) {
     case BeltState::Stopped:
         switch (event) {

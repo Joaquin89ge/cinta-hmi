@@ -20,12 +20,12 @@ Hay dos clases. **Información**, la manda la ESP32. **Acción**, la manda la Ra
 
 | Código | Número | En el mensaje |
 |---|---|---|
-| `StateCode::Stopped` | 1 | estado, parada |
-| `StateCode::Running` | 2 | estado, marcha |
-| `StateCode::Emergency` | 3 | estado, emergencia |
-| `SpeedCode::Low` | 1 | velocidad baja |
-| `SpeedCode::Medium` | 2 | velocidad media |
-| `SpeedCode::High` | 3 | velocidad alta |
+| `BeltState::Stopped` | 1 | estado, parada |
+| `BeltState::Running` | 2 | estado, marcha |
+| `BeltState::Emergency` | 3 | estado, emergencia |
+| `Speed::Low` | 1 | velocidad baja |
+| `Speed::Medium` | 2 | velocidad media |
+| `Speed::High` | 3 | velocidad alta |
 | `NavCode::Up` | 1 | arriba |
 | `NavCode::Down` | 2 | abajo |
 | `NavCode::Enter` | 3 | enter |
@@ -49,8 +49,8 @@ Las piezas no son un código: viajan como la cuenta. `$1,2,2,4` es marcha, veloc
 
 Al armar una línea se escribe el valor del mismo enum. No hay una segunda tabla de números. `writeStateLine` y `writeNavLine` arman la información. `writeCommandLine`, `writeSpeedLine` y `writeResetLine` arman `$3,<comando>`, `$4,<velocidad>` y `$5`. Terminan en `\n` y devuelven false si no entran en el buffer.
 
-`readStateLine` hace el camino inverso de `$1`: exige `$`, tipo estado y exactamente tres campos, y llena el `Belt`. El estado y la velocidad tienen que ser un código de la tabla. Si la línea no es un `$1` válido, devuelve false y el `Belt` queda como estaba. No llama a `apply`.
+`readStateLine` hace el camino inverso de `$1`: exige `$`, tipo estado y exactamente tres campos, y llena el `Belt`. El estado y la velocidad tienen que ser un valor de `BeltState` y `Speed` (1, 2 o 3). Si la línea no es un `$1` válido, devuelve false y el `Belt` queda como estaba. No llama a `apply`.
 
 ## Cable del banco
 
-El banco manda por UART2, TX GPIO17 y RX GPIO16, a 115200 8N1. UART0 es la consola del CH9102 (`/dev/ttyACM0`); instalar el protocolo ahí la pisaría. Pasar el enlace al USB de la Raspberry es cambiar las constantes de [esp32/main/drivers/pins.hpp](../esp32/main/drivers/pins.hpp).
+115200 8N1. El protocolo sale por UART2, TX GPIO17 y RX GPIO16 (`kUartGpio` en [pins.hpp](../esp32/main/drivers/pins.hpp)). En la Pi el puente abre `/dev/ttyS0`. Para probar por USB en la PC se cambia `kUart` a `kUartUsb` (UART0, `/dev/ttyACM0`) y se flashea. Con el USB no se abre el monitor, porque el puerto lo usa el puente.
