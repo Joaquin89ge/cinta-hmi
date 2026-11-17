@@ -36,6 +36,6 @@ constexpr UartPins kUartUsb = {UART_NUM_0, GPIO_NUM_1, GPIO_NUM_3};
 constexpr UartPins kUartGpio = {UART_NUM_2, GPIO_NUM_17, GPIO_NUM_16};
 
 // Cable activo. Para volver a probar por USB en la PC: kUartUsb y flashear.
-constexpr UartPins kUart = kUartUsb;
+constexpr UartPins kUart = kUartGpio;
 
 constexpr int kUartBaud = 115200;

@@ -14,3 +14,5 @@ dependencies.lock
 # Cachés
 .cache/
 .espressif/
+
+eos.tgz

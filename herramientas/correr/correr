@@ -1,0 +1,15 @@
+#!/bin/sh
+# Crea los FIFO, abre el puente en el UART de la Pi y la HMI en el monitor.
+hmi=/root/cinta_hmi
+puente=/root/puente
+
+for fifo in /tmp/fifo_nav /tmp/fifo_datos /tmp/fifo_cmd; do
+    [ -p "$fifo" ] || mkfifo "$fifo"
+    chmod 666 "$fifo"
+done
+
+"$puente" /dev/ttyS0 &
+pid=$!
+trap 'kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null' EXIT INT TERM
+sleep 1
+"$hmi" /dev/fb0
