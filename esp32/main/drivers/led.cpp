@@ -12,6 +12,7 @@ void Led::init() {
     config.pull_down_en = GPIO_PULLDOWN_DISABLE;
     config.intr_type = GPIO_INTR_DISABLE;
     ESP_ERROR_CHECK(gpio_config(&config));
+    // Arranca apagado. Quien lo prenda es la task.
     off();
 }
 

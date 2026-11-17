@@ -3,7 +3,7 @@
 # No usa Docker ni CMake: el EOS trae g++ y no trae cmake.
 # Salida: rpi/build/en-pi/cinta_hmi y rpi/build/en-pi/puente
 set -euo pipefail
-RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 salida="${RAIZ}/rpi/build/en-pi"
 mkdir -p "${salida}"
 

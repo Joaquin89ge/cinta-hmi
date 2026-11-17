@@ -122,9 +122,15 @@ c_wnd* connectedScreen() {
 
 // Armo la lista de controles, los conecto a la ventana y los muestro.
 void MainScreen::open(c_surface* next) {
+    // Dónde dibuja esta ventana (el lienzo 512×512 de mainLoop).
     set_surface(next);
+    // Solo llena tree_ con posiciones; los widgets aún no están en el árbol GuiLite.
     fillTree();
+    // connect (c_wnd, de GuiLite): registra MainScreen como raíz (parent nullptr,
+    // pantalla entera) y crea cada hijo leyendo tree_. Ahí corre pre_create_wnd
+    // y on_init_children (callbacks de botones, foco en ARRANCAR).
     connect(nullptr, ID_MAIN, nullptr, 0, 0, kScreenWidth, kScreenHeight, tree_);
+    // Primer dibujado: fondo y recorrido de hijos con show_window.
     show_window();
 }
 

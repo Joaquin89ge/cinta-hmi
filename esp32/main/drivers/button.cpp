@@ -15,6 +15,7 @@ void Button::init() {
     ESP_ERROR_CHECK(gpio_config(&config));
 }
 
+// Apretado es nivel bajo: el pulsador cierra el pin a GND.
 bool Button::isPressed() const {
     return gpio_get_level(pin_) == 0;
 }

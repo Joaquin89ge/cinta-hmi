@@ -15,30 +15,30 @@ sudo usermod -aG docker,dialout "$USER"
 La imagen oficial pesa unos 13 GB y ya está bajada. La nuestra se construye encima:
 
 ```bash
-herramientas/construir-imagen.sh
+herramientas/compilar/construir-imagen.sh
 ```
 
 ## Día a día
 
 | Acción | Comando |
 |---|---|
-| Compilar el firmware | `herramientas/compilar-fw.sh` |
-| Flashear la ESP32 | `herramientas/flashear.sh` |
-| Ver la consola serie | `herramientas/monitor.sh` |
-| Otro `idf.py` | `herramientas/idf.sh menuconfig` |
-| Compilar la HMI en la PC | `herramientas/compilar-hmi-pc.sh` |
-| Abrir esa HMI | `herramientas/correr-hmi-pc.sh` |
-| HMI estática para la Raspberry | `herramientas/compilar-hmi-rpi.sh` |
-| Puente estático para la Raspberry | `herramientas/compilar-puente-rpi.sh` |
-| Compilar HMI y puente en la Pi | `herramientas/compilar-en-pi.sh` |
-| Probar el ejemplo de la cátedra | `herramientas/probar-tablero.sh` |
-| Verificar el entorno | `herramientas/verificar.sh` |
-| Compilar la prueba de banco | `herramientas/banco.sh build` |
-| Flashear esa prueba | `herramientas/banco.sh -p /dev/ttyACM0 flash` |
+| Compilar el firmware | `herramientas/compilar/compilar-fw.sh` |
+| Flashear la ESP32 | `herramientas/placa/flashear.sh` |
+| Otro `idf.py` | `herramientas/placa/idf.sh menuconfig` |
+| HMI estática para la Raspberry | `herramientas/compilar/compilar-hmi-rpi.sh` |
+| Puente estático para la Raspberry | `herramientas/compilar/compilar-puente-rpi.sh` |
+| Correr HMI y puente en la Pi | `herramientas/correr/correr-en-pi.sh` |
+| Compilar la HMI en la PC | `herramientas/testeo/compilar-hmi-pc.sh` |
+| Abrir esa HMI | `herramientas/testeo/correr-hmi-pc.sh` |
+| Puente USB (ciclo en esta PC) | `herramientas/testeo/correr-puente.sh` |
+| Ver la consola serie | `herramientas/testeo/monitor.sh` |
+| Probar el ejemplo de la cátedra | `herramientas/testeo/probar-tablero.sh` |
+| Verificar el entorno | `herramientas/testeo/verificar.sh` |
+| Compilar la prueba de banco | `herramientas/testeo/banco.sh build` |
+| Flashear esa prueba | `herramientas/testeo/banco.sh -p /dev/ttyACM0 flash` |
 | Probar la lógica de la cinta | `cmake -S logica -B logica/build && cmake --build logica/build && ./logica/build/test_belt` |
-| Puente USB (ciclo en esta PC) | `herramientas/correr-puente.sh` |
 
-El puerto por defecto es `/dev/ttyACM0` (el CH9102 de esta placa enumera así). Si aparece en otro nodo: `CINTA_PUERTO=/dev/ttyACM1 herramientas/flashear.sh`.
+El puerto por defecto es `/dev/ttyACM0` (el CH9102 de esta placa enumera así). Si aparece en otro nodo: `CINTA_PUERTO=/dev/ttyACM1 herramientas/placa/flashear.sh`.
 
 El firmware está en `esp32/` y la HMI en `rpi/`. `compilar-hmi-pc.sh` y `compilar-hmi-rpi.sh` entran al contenedor y compilan con los presets de CMake `pc` y `rpi`. Si falta `rpi/CMakeLists.txt`, avisan y salen. El preset `rpi` usa `cmake/toolchain-rpi.cmake` y deja el ejecutable estático.
 
@@ -48,10 +48,10 @@ El firmware está en `esp32/` y la HMI en `rpi/`. `compilar-hmi-pc.sh` y `compil
 
 ## Raspberry
 
-En casa no hay Pi. `compilar-hmi-rpi.sh` deja la HMI en `rpi/build/rpi/` y `compilar-puente-rpi.sh` deja el puente en `puente/build/rpi/`. Esos binarios estáticos se copian a la EOS. En la Pi, si hay `g++`, `compilar-en-pi.sh` compila los dos y los deja en `rpi/build/en-pi/`. La HMI se corre contra `/dev/fb0` y el puente contra `/dev/ttyS0`.
+En casa no hay Pi. `compilar-hmi-rpi.sh` deja la HMI en `rpi/build/rpi/` y `compilar-puente-rpi.sh` deja el puente en `puente/build/rpi/`. Esos binarios estáticos se copian a la EOS. En la Pi no se compila: `correr-en-pi.sh` crea los tres FIFO, abre el puente en `/dev/ttyS0` y la HMI en `/dev/fb0`. Si los binarios no están en esas carpetas: `correr-en-pi.sh /ruta/cinta_hmi /ruta/puente`.
 
 `correr-hmi-pc.sh` deja `/tmp/fifo_nav`, `/tmp/fifo_datos` y `/tmp/fifo_cmd` en esta máquina, no solo dentro del contenedor. Desde otra terminal: `echo adelante > /tmp/fifo_nav` o `echo '$1,2,2,4' > /tmp/fifo_datos`.
 
 La X de la ventana cierra también la HMI. `xWindow` de la cátedra no atendía ese clic y el proceso seguía leyendo los FIFO; por eso se juntaban ventanas. Si quedó una vieja, el script la termina antes de abrir otra. Ctrl+C en esa terminal hace lo mismo.
 
-En `pins.hpp`, `kUart` es `kUartGpio`: hay que flashear para que la placa hable por GPIO17 y GPIO16. Para el ciclo por USB en esta PC se vuelve a `kUartUsb`, se flashea, y una terminal corre la HMI y otra `herramientas/correr-puente.sh`. El monitor no puede estar abierto.
+En `pins.hpp`, `kUart` es `kUartGpio`: hay que flashear para que la placa hable por GPIO17 y GPIO16. Para el ciclo por USB en esta PC se vuelve a `kUartUsb`, se flashea, y una terminal corre la HMI y otra `herramientas/testeo/correr-puente.sh`. El monitor no puede estar abierto.

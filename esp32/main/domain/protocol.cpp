@@ -5,7 +5,7 @@
 
 namespace {
 
-// Fin, \n, \r, o \r\n. Un carácter de más (otro campo, por ejemplo) no es esta línea.
+// at es donde terminó sscanf. Si después sobra texto que no es \r o \n, no es esta línea.
 bool tailOk(const char* line, int got, int fields, char tail, int at) {
     if (got < fields || at < 0) {
         return false;
@@ -31,6 +31,7 @@ bool inRange(int value, int low, int high) {
 
 }  // namespace
 
+// Arman la línea con el número del enum. false si no entró en el buffer.
 bool writeStateLine(char* buffer, int capacity, Belt belt) {
     int written = std::snprintf(
         buffer,
@@ -83,6 +84,7 @@ bool writeResetLine(char* buffer, int capacity) {
 }
 
 bool readStateLine(const char* line, Belt& belt) {
+    // $1,estado,velocidad,piezas. El Belt se escribe recién si todo cierra.
     int type = 0;
     int state = 0;
     int speed = 0;
@@ -110,6 +112,7 @@ bool readStateLine(const char* line, Belt& belt) {
 }
 
 bool interpret(const char* line, BeltEvent& event) {
+    // Primero $3 y $4, que traen un número. $5 no lleva coma y se lee más abajo.
     int type = 0;
     int code = 0;
     char tail = '\0';
@@ -147,6 +150,7 @@ bool interpret(const char* line, BeltEvent& event) {
         return false;
     }
 
+    // $5, sin coma. $3 solo, o un tipo desconocido, cae acá y se rechaza.
     tail = '\0';
     at = -1;
     got = std::sscanf(line, "$%d%n%c", &type, &at, &tail);

@@ -4,12 +4,10 @@
 // La HMI no cambia. El dispositivo es el único argumento.
 
 #include "linea.hpp"
-#include "protocol.hpp"
 
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <string>
 
 #include <fcntl.h>
@@ -33,19 +31,15 @@ int cmdFd = -1;
 Channel serialChannel;
 Channel cmdChannel;
 
-void writeAll(int fd, const char* path, const char* data, int length) {
-    ssize_t written = write(fd, data, static_cast<size_t>(length));
-    if (written < 0) {
+void writeLine(int fd, const char* path, const std::string& text) {
+    std::string out = text + "\n";
+    if (write(fd, out.data(), out.size()) < 0) {
         if (errno == EAGAIN) {
             std::fprintf(stderr, "%s: lleno, se pierde la línea\n", path);
             return;
         }
         std::perror(path);
     }
-}
-
-void writeText(int fd, const char* path, const char* text) {
-    writeAll(fd, path, text, static_cast<int>(std::strlen(text)));
 }
 
 int openFifo(const char* path) {
@@ -93,86 +87,29 @@ int openSerial(const char* path) {
     return fd;
 }
 
-// Fin, \n, \r, o \r\n. Un carácter de más no es esta línea.
-bool tailOk(const char* line, int got, int fields, char tail, int at) {
-    if (got < fields || at < 0) {
-        return false;
-    }
-    if (line[at] == '\0') {
-        return got == fields;
-    }
-    if (got != fields + 1) {
-        return false;
-    }
-    if (tail == '\n') {
-        return line[at + 1] == '\0';
-    }
-    if (tail == '\r') {
-        return line[at + 1] == '\0' || (line[at + 1] == '\n' && line[at + 2] == '\0');
-    }
-    return false;
-}
-
 void onSerialLine(const std::string& line) {
-    // Los logs de la consola comparten el USB en esta prueba. No empiezan con $.
-    // El $1 se copia igual a fifo_datos. El $2 se traduce a las palabras de la HMI.
-    if (line.empty() || line[0] != '$') {
+    // Lo que no empieza con $ es un log. No va a la HMI.
+    // $1 se copia tal cual. $2 se traduce: arriba es atras, abajo es adelante, OK es enter.
+    if (line.rfind("$1,", 0) == 0) {
+        writeLine(dataFd, kDataPath, line);
         return;
     }
-    const char* text = line.c_str();
-    int type = 0;
-    int state = 0;
-    int speed = 0;
-    int pieces = 0;
-    char tail = '\0';
-    int at = -1;
-    int got = std::sscanf(text, "$%d,%d,%d,%d%n%c", &type, &state, &speed, &pieces, &at, &tail);
-    if (tailOk(text, got, 4, tail, at)
-        && type == static_cast<int>(MessageType::State)
-        && state >= static_cast<int>(BeltState::Stopped)
-        && state <= static_cast<int>(BeltState::Emergency)
-        && speed >= static_cast<int>(Speed::Low)
-        && speed <= static_cast<int>(Speed::High)) {
-        char out[kLineCapacity];
-        int written = std::snprintf(out, sizeof(out), "%s\n", text);
-        if (written > 0 && written < static_cast<int>(sizeof(out))) {
-            writeAll(dataFd, kDataPath, out, written);
-        }
-        return;
-    }
-
-    // La HMI no entiende $2. Arriba es el ítem anterior (atras), abajo el siguiente
-    // (adelante) y el pulsador OK es enter.
-    int nav = 0;
-    tail = '\0';
-    at = -1;
-    got = std::sscanf(text, "$%d,%d%n%c", &type, &nav, &at, &tail);
-    if (!tailOk(text, got, 2, tail, at) || type != static_cast<int>(MessageType::Nav)) {
-        return;
-    }
-    const char* word = nullptr;
-    if (nav == static_cast<int>(NavCode::Up)) {
-        word = "atras\n";
-    } else if (nav == static_cast<int>(NavCode::Down)) {
-        word = "adelante\n";
-    } else if (nav == static_cast<int>(NavCode::Enter)) {
-        word = "enter\n";
-    }
-    if (word != nullptr) {
-        std::fprintf(stderr, "nav %s", word);
-        writeText(navFd, kNavPath, word);
+    if (line == "$2,1") {
+        std::fprintf(stderr, "nav atras\n");
+        writeLine(navFd, kNavPath, "atras");
+    } else if (line == "$2,2") {
+        std::fprintf(stderr, "nav adelante\n");
+        writeLine(navFd, kNavPath, "adelante");
+    } else if (line == "$2,3") {
+        std::fprintf(stderr, "nav enter\n");
+        writeLine(navFd, kNavPath, "enter");
     }
 }
 
-// fifo_cmd ya trae un $3, $4 o $5. Se le agrega el salto y se manda a la ESP32.
 void onCommandLine(const std::string& line) {
-    char out[kLineCapacity];
-    int written = std::snprintf(out, sizeof(out), "%s\n", line.c_str());
-    if (written <= 0 || written >= static_cast<int>(sizeof(out))) {
-        return;
-    }
-    std::fprintf(stderr, "cmd %s", out);
-    writeAll(serialFd, "serie", out, written);
+    // La HMI ya mandó $3, $4 o $5. Se le agrega el salto y se va a la placa.
+    std::fprintf(stderr, "cmd %s\n", line.c_str());
+    writeLine(serialFd, "serie", line);
 }
 
 }  // namespace

@@ -68,6 +68,7 @@ SemaphoreHandle_t coilMutex;
 SemaphoreHandle_t emergencySem;
 
 // Solo entrega el semáforo. El corte de las bobinas lo hace safetyTask.
+// Si esa task estaba dormida, el yield la despierta ahora.
 static void IRAM_ATTR emergencyIsr(void*) {
     BaseType_t woken = pdFALSE;
     xSemaphoreGiveFromISR(emergencySem, &woken);
@@ -104,6 +105,7 @@ static void beltTask(void*) {
     }
 }
 
+// Baja 8 ms, media 4, alta 2. Si la velocidad no cierra, queda la lenta.
 static int stepPeriodMs(Speed speed) {
     switch (speed) {
     case Speed::Low:
@@ -146,6 +148,7 @@ static void motorTask(void*) {
             green.off();
             red.off();
         }
+        // DelayUntil: el período se mide desde el despertar anterior, no desde ahora.
         vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(periodMs));
     }
 }
@@ -162,9 +165,11 @@ static void navTask(void*) {
     bool okSeen = false;
     bool okArmed = false;
     while (true) {
+        // seen es la muestra anterior. armed corta la repetición mientras sigue apretado.
         bool pressed = upButton.isPressed();
         if (pressed && upSeen && !upArmed) {
             NavCode nav = NavCode::Up;
+            // 0: si la cola está llena no espero. Se pierde este toque.
             if (xQueueSend(navQueue, &nav, 0) != pdTRUE) {
                 ESP_LOGW(kTag, "cola de navegación llena, se pierde un movimiento");
             }
@@ -213,6 +218,7 @@ static void pieceTask(void*) {
     bool counted = false;
     while (true) {
         if (pieceButton.isPressed()) {
+            // Hace falta verlo apretado ~30 ms seguidos. Un rebote corto no cuenta.
             stableMs += kPiecePeriodMs;
             if (!counted && stableMs >= kPieceStableMs) {
                 BeltEvent event = BeltEvent::Piece;
@@ -239,6 +245,7 @@ static void uartRxTask(void*) {
             continue;
         }
         BeltEvent event;
+        // false: era un log, un $1, un $2 o un número que no existe.
         if (!interpret(line, event)) {
             continue;
         }
@@ -266,6 +273,7 @@ static void uartTxTask(void*) {
         }
         now = xTaskGetTickCount();
         if (now >= nextState) {
+            // Copio y suelto: el $1 no se arma con el mutex tomado.
             xSemaphoreTake(beltMutex, portMAX_DELAY);
             Belt snapshot = belt;
             xSemaphoreGive(beltMutex);
@@ -295,7 +303,7 @@ static void heartbeatTask(void*) {
 }  // namespace
 
 extern "C" void app_main(void) {
-    // Hardware.
+    // Pines, motor y UART. Las tasks arrancan después, con esto ya listo.
     green.init();
     red.init();
     blue.init();
@@ -313,6 +321,7 @@ extern "C" void app_main(void) {
     beltMutex = xSemaphoreCreateMutex();
     coilMutex = xSemaphoreCreateMutex();
     emergencySem = xSemaphoreCreateBinary();
+    // Si falló un create, no sigo: sin cola o sin mutex la cinta no tiene sentido.
     configASSERT(eventQueue != nullptr);
     configASSERT(navQueue != nullptr);
     configASSERT(beltMutex != nullptr);

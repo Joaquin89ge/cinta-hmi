@@ -4,13 +4,13 @@
 # El main reintenta shmget; este script no espera esa memoria.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=contenedor.sh
-source "${DIR}/contenedor.sh"
+# shellcheck source=../contenedor.sh
+source "${DIR}/../contenedor.sh"
 
 bin="${CINTA_RAIZ}/rpi/build/pc/cinta_hmi"
 ventana="${CINTA_RAIZ}/copiaTotalMateria/material/Tablero/xWindow"
 if [[ ! -x "${bin}" ]]; then
-    echo "No está ${bin}. Primero corré herramientas/compilar-hmi-pc.sh." >&2
+    echo "No está ${bin}. Primero corré herramientas/testeo/compilar-hmi-pc.sh." >&2
     exit 1
 fi
 if [[ ! -x "${ventana}" ]]; then
@@ -49,7 +49,7 @@ contenedor_correr \
         done
         # El binario de la cátedra ignora la X. La biblioteca hace que ese clic salga.
         so=/trabajo/rpi/build/pc/xwindow-cierre.so
-        src=/trabajo/herramientas/xwindow-cierre.c
+        src=/trabajo/herramientas/testeo/xwindow-cierre.c
         if [[ ! -e "${so}" || "${src}" -nt "${so}" ]]; then
             mkdir -p /trabajo/rpi/build/pc
             gcc -shared -fPIC -o "${so}" "${src}" -lX11

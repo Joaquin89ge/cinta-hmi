@@ -23,6 +23,7 @@ constexpr int kHalfSteps[kHalfStepCount][4] = {
 StepperDriver::StepperDriver(gpio_num_t in1, gpio_num_t in2, gpio_num_t in3, gpio_num_t in4)
     : pins_{in1, in2, in3, in4} {}
 
+// Los cuatro GPIO juntos. Al terminar las bobinas quedan sueltas.
 void StepperDriver::init() {
     gpio_config_t config = {};
     config.pin_bit_mask = 0;
@@ -51,6 +52,7 @@ void StepperDriver::release() {
 }
 
 void StepperDriver::writePhase(int phase) {
+    // 1 energiza esa bobina, 0 la suelta.
     for (int coil = 0; coil < 4; ++coil) {
         gpio_set_level(pins_[coil], kHalfSteps[phase][coil]);
     }

@@ -3,8 +3,8 @@
 # El fuente está en copiaTotalMateria/, que no se sube al repo.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=contenedor.sh
-source "${DIR}/contenedor.sh"
+# shellcheck source=../contenedor.sh
+source "${DIR}/../contenedor.sh"
 
 segundos="${1:-15}"
 tablero="${CINTA_RAIZ}/copiaTotalMateria/material/Tablero"

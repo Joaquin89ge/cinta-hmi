@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "${DIR}/idf.sh" build
+exec "${DIR}/../placa/idf.sh" build

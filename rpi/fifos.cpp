@@ -81,12 +81,17 @@ void openFifos() {
 // Solo se leen navegación y estado. Las órdenes salen por writeOrder.
 // -1 frena a la HMI hasta que llegue una línea: la pantalla no tiene otro reloj.
 void pollFifos() {
+    // pollfd viene de <poll.h> (POSIX): un fd y qué eventos vigilar.
+    // fds[0] = fifo_nav (adelante/atras/enter). fds[1] = fifo_datos ($1).
     struct pollfd fds[2];
     fds[0].fd = navFd;
-    fds[0].events = POLLIN;
+    fds[0].events = POLLIN;  // avisar cuando haya bytes para leer
     fds[1].fd = dataFd;
     fds[1].events = POLLIN;
 
+    // poll(): duerme hasta que alguno de los dos fd tenga datos.
+    // fds = tabla; 2 = cantidad; -1 = sin timeout (espera indefinida).
+    // Devuelve cuántos fd despertaron, o -1 si falló (p. ej. señal).
     int ready = poll(fds, 2, -1);
     if (ready < 0) {
         if (errno == EINTR) {
@@ -95,6 +100,7 @@ void pollFifos() {
         std::perror("poll");
         return;
     }
+    // revents lo llena el kernel al volver; POLLIN = había algo para leer.
     if ((fds[0].revents & POLLIN) != 0) {
         drain(navChannel);
     }

@@ -2,8 +2,8 @@
 # Comprueba imagen, cross-compiler, puerto de la ESP32 y la ventana del ejemplo.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=contenedor.sh
-source "${DIR}/contenedor.sh"
+# shellcheck source=../contenedor.sh
+source "${DIR}/../contenedor.sh"
 
 echo "== imagen y ESP-IDF =="
 contenedor_correr -- idf.py --version

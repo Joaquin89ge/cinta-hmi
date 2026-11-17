@@ -32,12 +32,14 @@ void UartLink::init() {
         }
     }
 
+    // Recepción chica: las líneas son cortas. Sin cola de transmisión, el write espera.
     ESP_ERROR_CHECK(uart_driver_install(config_.port, kUartRxBufferBytes, 0, 0, nullptr, 0));
     ESP_ERROR_CHECK(uart_param_config(config_.port, &uart));
     ESP_ERROR_CHECK(uart_set_pin(
         config_.port, config_.tx, config_.rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 }
 
+// Manda los bytes que le pasan. El salto de línea ya viene en el texto.
 void UartLink::write(const char* text) {
     int written = uart_write_bytes(config_.port, text, std::strlen(text));
     ESP_ERROR_CHECK(written < 0 ? ESP_FAIL : ESP_OK);
@@ -53,6 +55,7 @@ bool UartLink::readLine(char* buffer, int capacity) {
             continue;
         }
         if (byte == '\n') {
+            // Vacía o más larga que el buffer: se tira. No dejo un pedazo como comando.
             if (length == 0 || length >= capacity) {
                 return false;
             }
