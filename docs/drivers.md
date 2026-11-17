@@ -20,7 +20,7 @@ No parpadea solo. Quién lo prende y cada cuánto es de la task que lo use.
 
 Entrada con pull-up interno. Suelto queda en alto. Apretado cierra a GND, así que `isPressed` es nivel bajo. Hay cinco objetos: arriba GPIO32, abajo GPIO33, OK GPIO25, pieza GPIO26 y emergencia GPIO27.
 
-No hace antirrebote y no instala interrupción. El rebote lo va a filtrar la task de piezas. La interrupción de emergencia la va a registrar la task de seguridad: el driver solo sabe leer el nivel.
+No hace antirrebote y no instala interrupción. El driver solo dice si el pin está en bajo. La task de navegación filtra arriba, abajo y OK con dos muestras. La de piezas pide unos 30 ms estables. La interrupción de emergencia la registra `app_main`, en el flanco de bajada, y la task de seguridad espera ese semáforo.
 
 ## StepperDriver
 

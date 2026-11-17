@@ -1,6 +1,6 @@
 # Dónde va cada mecanismo de FreeRTOS
 
-Las tasks están en [esp32/main/app_main.cpp](../esp32/main/app_main.cpp). FreeRTOS se llama directo, sin envolverlo en una clase. Se crean juntas y cada una lleva un comentario de por qué esa prioridad. El stack está en bytes. `uart_rx` usa 4096 porque `sscanf` de newlib corre en esa task; el resto sigue en 3072 o 2048.
+Las tasks están en [esp32/main/app_main.cpp](../esp32/main/app_main.cpp). FreeRTOS se llama directo, sin envolverlo en una clase. Se crean juntas y cada una lleva un comentario de por qué esa prioridad. El stack está en bytes. `uart_rx` usa 4096 porque `sscanf` de newlib corre en esa task. Navegación, piezas y `uart_tx` usan 3072, porque loguean o arman una línea. Seguridad, cinta, motor y latido usan 2048.
 
 La máquina de estados sigue siendo `apply`, en [esp32/main/domain/belt.cpp](../esp32/main/domain/belt.cpp). Una sola task la llama. El resto produce eventos o mira el resultado. Los drivers están en [drivers.md](drivers.md). Los números del cable están en [protocolo.md](protocolo.md).
 
@@ -47,10 +47,10 @@ Si la emergencia sigue accionada, o ya lo está al encender, ARRANCAR vuelve a m
 
 ### Navegación, piezas y uart_rx, prioridad 2
 
-Las tres son entradas. Comparten prioridad porque ninguna tiene que ganarle a la otra: las tres pueden esperar 20 ms.
+Las tres son entradas y comparten prioridad: ninguna tiene que ganarle a la otra.
 
 - Navegación, periódica cada 20 ms. Lee arriba, abajo y OK. Dos muestras seguidas encolan un `NavCode`, y no vuelve a encolar ese pulsador hasta que se suelta. El driver solo dice si el pin está en bajo. El flanco está escrito tres veces en la task: no hay una función común de antirrebote.
-- Piezas, periódica. Hace el antirrebote del pulsador y, por cada pulsación válida, encola `Piece`. El driver solo dice si el pin está en bajo.
+- Piezas, periódica cada 10 ms. Cuenta una pieza cuando el pulsador lleva unos 30 ms apretado, y no vuelve a contar hasta que se suelta. El driver solo dice si el pin está en bajo.
 - `uart_rx`, espera una línea. `readLine` bloquea hasta el `\n`. Si `interpret` reconoce una acción, encola ese `BeltEvent`. Una línea de log, o un `$1` que volvió por error, no entra a la cola.
 
 Si la cola está llena, `piezas`, `uart_rx` y la navegación avisan con `ESP_LOGW` y ese evento se pierde.

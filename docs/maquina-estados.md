@@ -48,10 +48,6 @@ No son estados. El menú puede cambiarlos con la cinta parada, en marcha o en em
 | `Piece` | Suma una pieza, también parada o en emergencia: el pulsador cuenta cada pulsación |
 | `ResetPieces` | Deja la cuenta en cero |
 
-## Probarla
+## Dónde se ve
 
-```bash
-cmake -S logica -B logica/build && cmake --build logica/build && ./logica/build/test_belt
-```
-
-Si no imprime nada y vuelve a la consola, los `assert` de [logica/test_belt.cpp](../logica/test_belt.cpp) pasaron. Un fallo corta en la línea que no se cumplió.
+`apply` está en [esp32/main/domain/belt.cpp](../esp32/main/domain/belt.cpp). La task `cinta` es la única que la llama. El diagrama de arriba es el de esa función.

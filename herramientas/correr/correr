@@ -1,15 +1,30 @@
 #!/bin/sh
-# Crea los FIFO, abre el puente en el UART de la Pi y la HMI en el monitor.
+# En la Pi, como root. Crea los tres FIFO, abre el puente en el UART y la HMI
+# en el monitor. Ctrl+C cierra los dos: el puente queda en segundo plano.
+
+# Binarios estáticos copiados a /root. Todavía no se ejecutan.
 hmi=/root/cinta_hmi
 puente=/root/puente
 
+# /tmp es memoria: al apagar se vacía, así que los canales se crean acá.
+# fifo_nav:   puente -> HMI, las palabras adelante, atras y enter.
+# fifo_datos: puente -> HMI, el estado $1 que manda la ESP32.
+# fifo_cmd:   HMI -> puente, las órdenes $3, $4 y $5.
 for fifo in /tmp/fifo_nav /tmp/fifo_datos /tmp/fifo_cmd; do
+    # -p es verdadero si ya es un named pipe. Si no, mkfifo lo crea.
     [ -p "$fifo" ] || mkfifo "$fifo"
+    # rw para todos. El puente también los crea con el modo 0666.
     chmod 666 "$fifo"
 done
 
+# El & no espera: el puente es un lazo infinito. ttyS0 son los pines 8 y 10.
 "$puente" /dev/ttyS0 &
+# $! es el pid de ese segundo plano. Hace falta para cerrarlo al salir.
 pid=$!
+# EXIT, Ctrl+C o TERM: matar el puente y esperar a que termine de verdad.
 trap 'kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null' EXIT INT TERM
+# Un segundo para que abra el puerto y los FIFO antes de que la HMI escriba.
 sleep 1
+# Primer plano, así este script vive mientras la HMI vive. fb0 es el monitor.
+# Al terminar, el trap de EXIT cierra el puente.
 "$hmi" /dev/fb0

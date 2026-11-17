@@ -51,6 +51,18 @@ Al armar una línea se escribe el valor del mismo enum. No hay una segunda tabla
 
 `readStateLine` hace el camino inverso de `$1`: exige `$`, tipo estado y exactamente tres campos, y llena el `Belt`. El estado y la velocidad tienen que ser un valor de `BeltState` y `Speed` (1, 2 o 3). Si la línea no es un `$1` válido, devuelve false y el `Belt` queda como estaba. No llama a `apply`.
 
+## El puente, en el medio
+
+La ESP32 no habla con la HMI directo. El proceso `puente` abre el puerto serie y tres named pipes. El código está en [puente/main.cpp](../puente/main.cpp). La HMI los abre en [rpi/fifos.cpp](../rpi/fifos.cpp).
+
+| Llega al puente | Sale hacia |
+|---|---|
+| `$1,...` por la serie | la misma línea, en `/tmp/fifo_datos` |
+| `$2,1` `$2,2` `$2,3` por la serie | `atras`, `adelante` o `enter` en `/tmp/fifo_nav` |
+| una línea de `/tmp/fifo_cmd` | la misma línea, por la serie |
+
+Lo que no empieza con `$` no cruza. La pantalla arma `$3` y `$4` en `writeCommandLine` y `writeSpeedLine`, y los escribe en `fifo_cmd`. `writeResetLine` arma el `$5` y la ESP32 lo convierte en `ResetPieces`, pero ningún botón de la pantalla lo llama.
+
 ## Cable del banco
 
 115200 8N1. El protocolo sale por UART2, TX GPIO17 y RX GPIO16 (`kUartGpio` en [pins.hpp](../esp32/main/drivers/pins.hpp)). En la Pi el puente abre `/dev/ttyS0`. Para probar por USB en la PC se cambia `kUart` a `kUartUsb` (UART0, `/dev/ttyACM0`) y se flashea. Con el USB no se abre el monitor, porque el puerto lo usa el puente.

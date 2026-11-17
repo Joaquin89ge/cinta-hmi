@@ -32,7 +32,7 @@ proceso puente (Linux) ──► /tmp/fifo_nav   ──► proceso HMI (GuiLite)
                        ◄── /tmp/fifo_cmd   ◄──
 ```
 
-Para revisar el diseño antes de seguir: [drivers.md](drivers.md), [protocolo.md](protocolo.md) y [freertos.md](freertos.md).
+El mapa de los documentos está en el [README](../README.md). La tarjeta y el arranque están en [raspberry.md](raspberry.md).
 
 ## Stack
 
@@ -41,7 +41,7 @@ Para revisar el diseño antes de seguir: [drivers.md](drivers.md), [protocolo.md
 | Firmware | ESP-IDF, C++ liviano, FreeRTOS sin envoltorios |
 | HMI | C++ con GuiLite, partiendo del ejemplo de la cátedra (`main.cpp`, `mvc.cpp`, `xWindow`) |
 | Puente serie | C++, POSIX (`termios`, `poll`) |
-| Build | CMake en todo (ESP-IDF ya lo usa); presets `pc` y `rpi` para la HMI |
+| Build | CMake en todo (ESP-IDF ya lo usa); presets `pc` y `rpi` para la HMI y el puente |
 | Simulación en PC | Ubuntu + `xWindow` (framebuffer simulado de la cátedra) |
 | RPi | EOS en arm64; cross-compilado con `aarch64-linux-gnu-g++`, linkeo estático |
 | Entorno | Contenedor `cinta-hmi-dev:v6.1` (ESP-IDF v6.1). Ver `docs/entorno.md` |
@@ -102,7 +102,7 @@ Los números son los enum de [protocolo.md](protocolo.md). El 0 no se usa.
 | RPi → ESP32 | `$4,<velocidad>` |
 | RPi → ESP32 | `$5` |
 
-El puente ignora las líneas que no empiezan con `$` (así los logs de depuración no molestan). La ESP32 manda el `$1` cada 100 ms. El enlace es UART2, TX GPIO17 y RX GPIO16, para no pisar la consola de UART0. En la Pi se enciende con `enable_uart=1` y el puente abre `/dev/ttyS0`. El USB (`kUartUsb`, `/dev/ttyACM0`) queda solo para probar en la PC, y hay que flashear para volver.
+El puente ignora las líneas que no empiezan con `$` (así los logs de depuración no molestan). Traduce `$2,1`, `$2,2` y `$2,3` a las palabras `atras`, `adelante` y `enter` en `/tmp/fifo_nav`, y copia el `$1` a `/tmp/fifo_datos`. La ESP32 manda el `$1` cada 100 ms. El enlace es UART2, TX GPIO17 y RX GPIO16, para no pisar la consola de UART0. En la Pi se enciende con `enable_uart=1` y el puente abre `/dev/ttyS0`. El fuente deja `kUart` en `kUartGpio`. El USB (`kUartUsb`, `/dev/ttyACM0`) queda solo para probar en la PC, y hay que flashear para ir y para volver. El `$5` lo entiende la ESP32; la pantalla de ahora no lo manda.
 
 ## Pantallas
 
@@ -135,7 +135,6 @@ Control PID, encoder, gráficos de respuesta, log a archivo, más pantallas.
 Tampoco el enclavamiento de la emergencia (ARRANCAR sale aunque el pulsador siga apretado).
 Pueden venir después del MVP; no adelantarlos.
 
-## Fechas
+## Defensa
 
-- Martes 10/11: consulta en el laboratorio (probar en la RPi real).
-- Lunes 16/11, 13:00: entrega por MIeL y defensa.
+Corre en la Raspberry del laboratorio, con la SD de [raspberry.md](raspberry.md), el monitor en `/dev/fb0` y la ESP32 flasheada por GPIO17 y GPIO16.

@@ -32,7 +32,7 @@ Es una interfaz de operario, no una app: clara, ordenada y sin adornos.
 ├──────────────────────────────┤
 │   ▐ ARRANCAR ▌               │
 │   [ PARAR    ]               │
-│   [ AJUSTES  ]               │
+│   velocidad  [−] 2 [+]       │
 └──────────────────────────────┘
 ```
 

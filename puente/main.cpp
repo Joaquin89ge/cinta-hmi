@@ -18,9 +18,11 @@
 
 namespace {
 
+// fifo_nav y fifo_datos salen hacia la HMI. fifo_cmd entra, desde la HMI.
 constexpr const char* kNavPath = "/tmp/fifo_nav";
 constexpr const char* kDataPath = "/tmp/fifo_datos";
 constexpr const char* kCmdPath = "/tmp/fifo_cmd";
+// La misma velocidad que la UART de la ESP32.
 constexpr speed_t kBaud = B115200;
 
 int serialFd = -1;
@@ -33,6 +35,8 @@ Channel cmdChannel;
 
 void writeLine(int fd, const char* path, const std::string& text) {
     std::string out = text + "\n";
+    // Los fd son no bloqueantes. Si el FIFO está lleno, se pierde la línea
+    // y el lazo sigue: bloquear acá frenaría también la serie.
     if (write(fd, out.data(), out.size()) < 0) {
         if (errno == EAGAIN) {
             std::fprintf(stderr, "%s: lleno, se pierde la línea\n", path);
@@ -43,6 +47,7 @@ void writeLine(int fd, const char* path, const std::string& text) {
 }
 
 int openFifo(const char* path) {
+    // correr ya los creó. EEXIST no es un error.
     if (mkfifo(path, 0666) < 0 && errno != EEXIST) {
         std::perror(path);
         std::exit(EXIT_FAILURE);
@@ -72,6 +77,8 @@ int openSerial(const char* path) {
     cfmakeraw(&config);
     cfsetispeed(&config, kBaud);
     cfsetospeed(&config, kBaud);
+    // 8 bits, sin paridad ni control de flujo. CLOCAL ignora el módem: el
+    // cable de la Pi no tiene esas líneas. CREAD habilita la recepción.
     config.c_cflag |= CLOCAL | CREAD;
     config.c_cflag &= ~CSTOPB;
     config.c_cflag &= ~PARENB;
@@ -137,7 +144,8 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "puente en %s, 115200. No abras el monitor.\n", argv[1]);
 
     // La serie va hacia la HMI; fifo_cmd, hacia la ESP32.
-    // -1: este lazo espera a que alguno de los dos tenga bytes. EINTR es una señal.
+    // fifo_nav y fifo_datos no se esperan: este proceso solo los escribe.
+    // -1: el lazo espera a que alguno de los dos tenga bytes. EINTR es una señal.
     while (true) {
         pollfd fds[2];
         fds[0].fd = serialFd;
